@@ -64,6 +64,7 @@ function @test() {
         NR == n { 
             if ( $1 == "function" ) {
                 print $2
+                exit 0
             } else {
                 exit 1
             }
