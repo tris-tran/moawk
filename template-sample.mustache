@@ -1,17 +1,3 @@
-#!/bin/bash
-#
-#
-
-
-
-AWK=/bin/mawk
-AWK_OPTIONS=" --posix "
-MOAWK="moawk.awk"
-
-NAME="tochoa"
-PERSON="rosa"
-
-TEMPLATE=$(cat << END
 {{! Comment }}Linea con comentario
 inicio {{! Comment }}Linea con comentario
 inicio{{! Comment }}Linea con comentario
@@ -30,6 +16,10 @@ asd {{{NAME}}} asd
 asd {{NAME}} {{! esto es {{NAME}} un comentario}} second {{! esto es un comentario}}
 no line
 
+{{=[[ ]]=}}
+
+[[!
+
 {{=|| ||=}}{{=|| ||=}}
 {{=|| ||=}}
 ||NAME|| |
@@ -42,12 +32,6 @@ pepe<%NAME%> pepe <
 %%={{ }}=%%
 {{NAME}} {
 
+]]
+
 {{#PERSON}} {{.}} {{\PERSON}}
-END
-)
-
-echo "$TEMPLATE" > template-sample.mustache
-
-echo $AWK "$AWK_OPTIONS" -f "$MOAWK"
-
-echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWK"

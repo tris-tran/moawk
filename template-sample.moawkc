@@ -1,0 +1,36 @@
+Linea con comentario\n
+inicio Linea con comentario\n
+inicioLinea con comentario\n
+\n
+\n
+startend\n
+START COMMENT\n
+startend\n
+FIN COMMENT\n
+\n
+#moawk#|text|newline|INTERPOLATION
+#moawk#|text|simple|asd 
+#moawk#|replacer|NAME|
+#moawk#|text|newline|asd
+
+pepe<%NAME%> pepe <
+#moawk#|text|simple|pepe
+#moawk#|replacer|NAME|
+#moawk#|text|newline| pepe <
+
+asd{{NAME}}asd
+asd {{{NAME}}} asd
+{{{NAME}}
+asd {{NAME}} {{! esto es {{NAME}} un comentario}} second {{! esto es un comentario}}
+no line
+{{#PERSON}} {{.}} {{\PERSON}}
+
+#moawk#|section|PERSON|
+#moawk#|test|newline|asde
+#moawk#|replacer|.|
+#moawk#|test|newline|
+#moawk#|section-end|PERSON|
+
+
+
+

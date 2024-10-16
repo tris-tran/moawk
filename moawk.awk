@@ -60,13 +60,7 @@ function checkLine() {
     return 0
 }
 
-match($0, DELIMITER) && !insideComment {
-    tag=getTag()
-    removeTag("")
-    key=substr(tag, OPEN_TAG_LEN+2, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN-2)
-    split(key, separators, " ")
-    redefineTags(separators[1], separators[2])
-}
+
 
 match($0, COMMENT) && !insideComment {
     do {
@@ -86,15 +80,12 @@ insideComment && match($0, COMMENT_END) {
     insideComment=0
 }
 
-
-match($0, BLOCK) && !insideComment {
-    print $0
-    next
-}
-
-match($0, END_BLOCK) && !insideComment {
-    print "END_BLOCK"
-    next
+match($0, DELIMITER) && !insideComment {
+    tag=getTag()
+    removeTag("")
+    key=substr(tag, OPEN_TAG_LEN+2, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN-2)
+    split(key, separators, " ")
+    redefineTags(separators[1], separators[2])
 }
 
 match($0, NORMAL) && !insideComment {
@@ -107,6 +98,18 @@ match($0, NORMAL) && !insideComment {
         if (checkLine()) { next }
     } while(match($0, NORMAL)) 
 }
+
+match($0, BLOCK) && !insideComment {
+    print $0
+    next
+}
+
+match($0, END_BLOCK) && !insideComment {
+    print "END_BLOCK"
+    next
+}
+
+
 
 !insideComment {print $0}
 
