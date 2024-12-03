@@ -4,6 +4,8 @@ BEGIN {
     FS="\n"
     OFS=""
 
+    SEP="#moawk#"
+
     ESCAPE_TEST=")(}{><%\\"    
     if (match(ESCAPE_TEST, escapeRegex(ESCAPE_TEST))) {
     } else {
@@ -56,11 +58,7 @@ function escapeRegex(regex) {
 }
 
 function compile(type, subtype, text) {
-    if (subtype) {
-        print "#moawk#|" type "|" subtype "|" text
-    } else {
-        print "#moawk#|" type "|" text
-    }
+    print type SEP subtype SEP text
 }
 
 function compiletext(text) {
@@ -99,48 +97,62 @@ $0 !~ ANY_TAG && !insideComment {
 
 # If we are here it means that $0 have a tag and it is free of comments
 !insideComment { 
-    delimiter($0)
+    delimiter()
 }
 
-function delimiter(line) {
-    if (match(line, DELIMITER)) {
-        if (RSTART != 0) {
-            start = substr(line, 0, RSTART - 1)
-            parseTags(start)
-        }
-
-        tag=substr(line, RSTART, RLENGTH)
+function delimiter() {
+    if (match($0, DELIMITER)) {
+        tag=getTag()
         key=substr(tag, OPEN_TAG_LEN+2, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN-2)
         split(key, separators, " ")
 
-        print "text" line
-        print DELIMITER
-        print RSTART " " RLENGTH
-        print "TAG" tag
-        print "SEP" separators[1] separators[2]
+        delStart=RSTART
+        delLength=RLENGTH
 
-        exit
+        if (RSTART != 0) {
+            start=substr($0, 0, RSTART - 1)
+            end=substr($0, RSTART, length($0))
+            $0=start
+            parseTags("simple")
+            $0=end
+        }
 
         redefineTags(separators[1], separators[2])
-
-        text=substr(line, RSTART + RLENGTH, length($0))
-        delimiter(line)
+        $0=substr($0, delStart + delLength, length($0))
+        delimiter()
     }
-    parseTags(text)
+    if ($0 == "") return
+    parseTags("newline")
 }
 
-function parseTags(text) {
+function parseTags(textType) {
     while(match($0, ANY_NORMAL)) {
         if (RSTART != 0) {
             text = substr($0, 0, RSTART - 1)
-            compiletext(text)
+            compile("text", "simple", text)
         }
 
         tag=getTag()
-        compile("tag", "unknown", tag)
+        key=substr(tag, OPEN_TAG_LEN+1, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN)
+        key=removeSpaces(key)
+
+        type=substr(key, 0, 1)
+        
+        start=2
+        if (type == "#") type = "section"
+        else if (type == "\\") type = "section-end"
+        else { 
+            start=start - 1
+            type = "replacer" 
+        }
+
+        value=substr(key, start, length(key))
+        value=removeSpaces(value)
+
+        compile("tag", type, value)
         $0=substr($0, RSTART + RLENGTH, length($0))
     }
-    compiletext($0)
+    compile("text", textType, $0)
 }
 
 function removeTag(value) {
@@ -149,5 +161,8 @@ function removeTag(value) {
 
 function getTag() { return substr($0, RSTART, RLENGTH) }
 
-
+function removeSpaces(key) {
+    gsub(/^[ \t]+|[ \t]+$/, "", key)
+    return key
+}
 

@@ -4,10 +4,13 @@
 
 AWK=/bin/mawk
 AWK_OPTIONS=" --posix "
-MOAWK="moawkc.awk"
+MOAWK="moawk.awk"
+MOAWKC="moawkc.awk"
 
-NAME="tochoa"
-PERSON="rosa"
+declare -g NAME="tochoa"
+export NAME
+declare -g PERSON="rosa"
+export PERSON
 
 TEMPLATE=$(cat << END
 {{! Comment }}Linea con comentario
@@ -28,7 +31,7 @@ asd {{{NAME}}} asd
 asd {{NAME}} {{! esto es {{NAME}} un comentario}} second {{! esto es un comentario}}
 no line
 
-{{=|| ||=}}{{=|| ||=}}
+a{{=|| ||=}}{{=|| ||=}}
 {{=|| ||=}}
 ||NAME|| |
 ||=||| |||=||
@@ -49,4 +52,9 @@ echo "$TEMPLATE" > template-sample.mustache
 echo $AWK "$AWK_OPTIONS" -f "$MOAWK"
 
 echo "$TEMPLATE"
-echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWK"
+#echo "COMPILATION"
+#echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWKC"
+
+echo "MUSTACHE"
+echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWKC" | command $AWK $AWK_OPTIONS -f "./$MOAWK"
+
