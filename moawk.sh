@@ -2,11 +2,9 @@
 #
 #
 
-
-
 AWK=/bin/mawk
 AWK_OPTIONS=" --posix "
-MOAWK="moawk.awk"
+MOAWK="moawkc.awk"
 
 NAME="tochoa"
 PERSON="rosa"
@@ -50,4 +48,5 @@ echo "$TEMPLATE" > template-sample.mustache
 
 echo $AWK "$AWK_OPTIONS" -f "$MOAWK"
 
+echo "$TEMPLATE"
 echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWK"

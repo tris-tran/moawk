@@ -25,7 +25,9 @@ function redefineTags(openTag, closeTag) {
 
     DELIMITER=OPEN_TAG"=[^ =]+ [^ =]+="CLOSE_TAG
 
-    ANY_TAG=OPEN_TAG".*"CLOES_TAG
+    ANY_TAG=OPEN_TAG".*"CLOSE_TAG
+    ANY_NORMAL=OPEN_TAG"[!#\\\]? *"KEY_VALID_CHARS"+ *"CLOSE_TAG
+
     COMMENT=OPEN_TAG"! *.* *"CLOSE_TAG
 
     COMMENT_START=OPEN_TAG"! *.*"
@@ -53,26 +55,36 @@ function escapeRegex(regex) {
     return result
 }
 
-$0 !~ ANY_TAG && $0 !~ COMMENT_START && !insideComment { print $0; next } 
+function compile(type, subtype, text) {
+    if (subtype) {
+        print "#moawk#|" type "|" subtype "|" text
+    } else {
+        print "#moawk#|" type "|" text
+    }
+}
+
+function compiletext(text) {
+    compile("text", "newline", text)
+}
 
 function checkLine() {
-    if ($0 !~ ANY_TAG) { print $0; return 1 }
+    if ($0 !~ ANY_TAG) { return 1 }
     return 0
 }
 
-
+$0 !~ ANY_TAG && $0 !~ COMMENT_START && !insideComment { compiletext($0); next } 
 
 match($0, COMMENT) && !insideComment {
     do {
         removeTag("")
-        if (checkLine()) { next }
+        if (checkLine()) { compiletext($0); next }
     } while(match($0, COMMENT))
 }
 
 match($0, COMMENT_START) && !insideComment {
     insideComment=1
     $0=substr($0, 0, RSTART-1) 
-    printf $0
+    compile("text", "simple", $0)
 }
 
 insideComment && match($0, COMMENT_END) {
@@ -80,36 +92,56 @@ insideComment && match($0, COMMENT_END) {
     insideComment=0
 }
 
-match($0, DELIMITER) && !insideComment {
-    tag=getTag()
-    removeTag("")
-    key=substr(tag, OPEN_TAG_LEN+2, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN-2)
-    split(key, separators, " ")
-    redefineTags(separators[1], separators[2])
+$0 !~ ANY_TAG && !insideComment {
+    compiletext($0)
+    next
 }
 
-match($0, NORMAL) && !insideComment {
-    do {
+# If we are here it means that $0 have a tag and it is free of comments
+!insideComment { 
+    delimiter($0)
+}
+
+function delimiter(line) {
+    if (match(line, DELIMITER)) {
+        if (RSTART != 0) {
+            start = substr(line, 0, RSTART - 1)
+            parseTags(start)
+        }
+
+        tag=substr(line, RSTART, RLENGTH)
+        key=substr(tag, OPEN_TAG_LEN+2, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN-2)
+        split(key, separators, " ")
+
+        print "text" line
+        print DELIMITER
+        print RSTART " " RLENGTH
+        print "TAG" tag
+        print "SEP" separators[1] separators[2]
+
+        exit
+
+        redefineTags(separators[1], separators[2])
+
+        text=substr(line, RSTART + RLENGTH, length($0))
+        delimiter(line)
+    }
+    parseTags(text)
+}
+
+function parseTags(text) {
+    while(match($0, ANY_NORMAL)) {
+        if (RSTART != 0) {
+            text = substr($0, 0, RSTART - 1)
+            compiletext(text)
+        }
+
         tag=getTag()
-        key=substr(tag, OPEN_TAG_LEN+1, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN)
-        key=removeSpaces(key)
-        value=getValue("", key)
-        removeTag(value)
-        if (checkLine()) { next }
-    } while(match($0, NORMAL)) 
+        compile("tag", "unknown", tag)
+        $0=substr($0, RSTART + RLENGTH, length($0))
+    }
+    compiletext($0)
 }
-
-match($0, BLOCK) && !insideComment {
-    print $0
-    next
-}
-
-match($0, END_BLOCK) && !insideComment {
-    print "END_BLOCK"
-    next
-}
-
-!insideComment {print $0}
 
 function removeTag(value) {
     $0=substr($0, 0, RSTART-1) value substr($0, RSTART + RLENGTH, length($0))
@@ -117,15 +149,5 @@ function removeTag(value) {
 
 function getTag() { return substr($0, RSTART, RLENGTH) }
 
-function getValue(keyPrefix, key) {
-    finalKey=key
-    if (keyPrefix) { finalKey=keyPrefix key } 
-    value=LOCALENV[finalKey]
-    if ( ! value) { return ENVIRON[finalKey] }
-    return value
-}
 
-function removeSpaces(key) {
-    gsub(/^[ \t]+|[ \t]+$/, "", key)
-    return key
-}
+
