@@ -4,8 +4,6 @@ BEGIN {
     FS="\n"
     OFS=""
 
-    SEP="#moawk#"
-
     ESCAPE_TEST=")(}{><%\\"    
     if (match(ESCAPE_TEST, escapeRegex(ESCAPE_TEST))) {
     } else {
@@ -14,6 +12,9 @@ BEGIN {
     }   
 
     redefineTags("{{", "}}")
+
+    SEC_I=1
+    SECTION[0]="root"
 }
 
 function redefineTags(openTag, closeTag) {
@@ -58,11 +59,12 @@ function escapeRegex(regex) {
 }
 
 function compile(type, subtype, text) {
-    print type SEP subtype SEP text
+    sec=sectionKey()
+    print type SEP subtype SEP sec SEP text
 }
 
 function compiletext(text) {
-    compile("text", "newline", text)
+    compile(C_TEXT, C_TXT_NWLN, text)
 }
 
 function checkLine() {
@@ -113,7 +115,7 @@ function delimiter() {
             start=substr($0, 0, RSTART - 1)
             end=substr($0, RSTART, length($0))
             $0=start
-            parseTags("simple")
+            parseTags(C_TXT_SIMPLE)
             $0=end
         }
 
@@ -122,14 +124,14 @@ function delimiter() {
         delimiter()
     }
     if ($0 == "") return
-    parseTags("newline")
+    parseTags(C_TXT_NWLN)
 }
 
 function parseTags(textType) {
     while(match($0, ANY_NORMAL)) {
         if (RSTART != 0) {
             text = substr($0, 0, RSTART - 1)
-            compile("text", "simple", text)
+            compile(C_TEXT, C_TXT_SIMPLE, text)
         }
 
         tag=getTag()
@@ -139,20 +141,45 @@ function parseTags(textType) {
         type=substr(key, 0, 1)
         
         start=2
-        if (type == "#") type = "section"
-        else if (type == "\\") type = "section-end"
-        else { 
+        if (type == "#") {
+            type=C_SECTION
+            secVal=substr(key, start, length(key))
+            SEC=secVal
+            SECTION[SEC_I]=SEC
+            SEC_I+=1
+        } else if (type == "\\") {
+            type=C_END_SECTION
+            secVal=substr(key, start, length(key))
+            SEC=secVal
+            SEC_I-=1
+            CURR_SEC=SECTION[SEC_I]
+            if (CURR_SEC != SEC) {
+                print "ERROR"
+                exit 1
+            }
+            SECTION[SEC_I]=""
+        } else if (type == ">") {
+
+        } else { 
             start=start - 1
-            type = "replacer" 
+            type = C_REPLACE
         }
 
         value=substr(key, start, length(key))
         value=removeSpaces(value)
 
-        compile("tag", type, value)
+        compile(C_TAG, type, value)
         $0=substr($0, RSTART + RLENGTH, length($0))
     }
-    compile("text", textType, $0)
+    compile(C_TEXT, textType, $0)
+}
+
+function sectionKey() {
+    key=""
+    for (i=0; i<SEC_I-1; i++) {
+        key=key SECTION[i] "."
+    }
+    return key "" SECTION[SEC_I-1]
 }
 
 function removeTag(value) {

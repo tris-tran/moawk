@@ -4,6 +4,7 @@
 
 AWK=/bin/mawk
 AWK_OPTIONS=" --posix "
+COMMONAWK="common.awk"
 MOAWK="moawk.awk"
 MOAWKC="moawkc.awk"
 
@@ -43,7 +44,27 @@ pepe<%NAME%> pepe <
 %%={{ }}=%%
 {{NAME}} {
 
-{{#PERSON}} {{.}} {{\PERSON}}
+{{#PERSON}} 
+    {{.}} 
+    {{#SEC1}}
+        {{#SEC2}}
+            {{.}}
+        {{\SEC2}}
+    {{\SEC1}}
+{{\PERSON}}
+
+{{NAME}}
+
+{{#PP}} 
+    {{.}} 
+    {{#SEC1}}
+        {{#SEC2}}
+            {{.}}
+        {{\SEC2}}
+    {{\SEC1}}
+{{\PP}}
+
+golasd
 END
 )
 
@@ -53,8 +74,8 @@ echo $AWK "$AWK_OPTIONS" -f "$MOAWK"
 
 echo "$TEMPLATE"
 #echo "COMPILATION"
-#echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWKC"
+#echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$COMMONAWK" -f "./$MOAWKC" 
 
 echo "MUSTACHE"
-echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$MOAWKC" | command $AWK $AWK_OPTIONS -f "./$MOAWK"
+echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$COMMONAWK" -f "./$MOAWKC" | command $AWK $AWK_OPTIONS -f "./$COMMONAWK" -f "./$MOAWK"
 
