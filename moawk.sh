@@ -5,77 +5,50 @@
 AWK=/bin/mawk
 AWK_OPTIONS=" --posix "
 COMMONAWK="common.awk"
+FROMAWK="from-awk.awk"
 MOAWK="moawk.awk"
 MOAWKC="moawkc.awk"
 
-declare -g NAME="tochoa"
-export NAME
-declare -g PERSON="rosa"
-export PERSON
 
-TEMPLATE=$(cat << END
-{{! Comment }}Linea con comentario
-inicio {{! Comment }}Linea con comentario
-inicio{{! Comment }}Linea con comentario
+function json.flatten() {
+    local json=$1
 
-startend
-START COMMENT
-start{{! comentario
-multilinea}}end
-FIN COMMENT
+    echo "$json" | jq  '. as $in | reduce paths(type == "array") as $path ({}; . + { ($path | map(tostring) | join(".")):  $in | getpath($path) | length,  ($path | map(tostring) | join(".") + ".type"):  "array" })' \
+    | jq 'to_entries|map("\(.key) = \(.value|tostring)")|.[]' \
+    | awk '{ print substr($0, 2, length($0) -2)}'
 
-INTERPOLATION
-asd {{NAME}} asd
-asd{{NAME}}asd
-asd {{{NAME}}} asd
-{{{NAME}}
-asd {{NAME}} {{! esto es {{NAME}} un comentario}} second {{! esto es un comentario}}
-no line
+    echo "$json" |  jq '. as $in | reduce paths(type == "object") as $path ({}; . + { ($path | map(tostring) | join(".")):  "object" })' \
+    | jq 'to_entries|map("\(.key) = \(.value|tostring)")|.[]' \
+    | awk '{ print substr($0, 2, length($0) -2)}'
 
-a{{=|| ||=}}{{=|| ||=}}
-{{=|| ||=}}
-||NAME|| |
-||=||| |||=||
-|||NAME||| |
-|||=<% %>=|||{{NAME}}<%NAME%>
-pepe<%NAME%> pepe <
-<%=%% %%=%>
-%%NAME%% %
-%%={{ }}=%%
-{{NAME}} {
+    echo "$json" \
+    | jq  '. as $in | reduce paths(type != "object" and type != "array") as $path ({}; . + { ($path | map(tostring) | join(".")): $in | getpath($path)     })' \
+    | jq 'to_entries|map("\(.key) = \(.value|tostring)")|.[]' \
+    | awk '{ print substr($0, 2, length($0) -2)}'
+}
 
-{{#PERSON}} 
-    {{.}} 
-    {{#SEC1}}
-        {{#SEC2}}
-            {{.}}
-        {{\SEC2}}
-    {{\SEC1}}
-{{\PERSON}}
+function compileFile() {
+    local template=$1
+    $AWK -f $COMMONAWK -f $MOAWKC $template 
+}
 
-{{NAME}}
+function compile() {
+    local template=$1
+    echo "$template" | $AWK -f $COMMONAWK -f $MOAWKC 
+}
 
-{{#PP}} 
-    {{.}} 
-    {{#SEC1}}
-        {{#SEC2}}
-            {{.}}
-        {{\SEC2}}
-    {{\SEC1}}
-{{\PP}}
+function interpolate() {
+    local compile=$1
+    local varfile=$2
+    $AWK -f $COMMONAWK -f $FROMAWK -f $MOAWK $varfile $compile
+}
 
-golasd
-END
-)
+function prueba() {
+    json=$(cat "./pruebas/two.json")
+    template=$(cat "./pruebas/one.mustache")
 
-echo "$TEMPLATE" > template-sample.mustache
-
-echo $AWK "$AWK_OPTIONS" -f "$MOAWK"
-
-echo "$TEMPLATE"
-#echo "COMPILATION"
-#echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$COMMONAWK" -f "./$MOAWKC" 
-
-echo "MUSTACHE"
-echo "$TEMPLATE" | command $AWK $AWK_OPTIONS -f "./$COMMONAWK" -f "./$MOAWKC" | command $AWK $AWK_OPTIONS -f "./$COMMONAWK" -f "./$MOAWK"
+    json.flatten "$json" > ./pruebas/two || exit 1
+    compile "$template" > "./pruebas/one.moc" || exit 1
+    interpolate "./pruebas/one.moc" "./pruebas/two" || exit 1
+}
 

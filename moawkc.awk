@@ -12,9 +12,7 @@ BEGIN {
     }   
 
     redefineTags("{{", "}}")
-
-    SEC_I=1
-    SECTION[0]="root"
+    SEC_I=0
 }
 
 function redefineTags(openTag, closeTag) {
@@ -37,6 +35,7 @@ function redefineTags(openTag, closeTag) {
     COMMENT_END=CLOSE_TAG
 
     NORMAL=OPEN_TAG"[^!#\\\{}] *"KEY_VALID_CHARS"+ *"CLOSE_TAG
+    UNESCAPE_NORMAL=OPEN_TAG"{[^!#\\\{}] *"KEY_VALID_CHARS"+ *}"CLOSE_TAG
     BLOCK=OPEN_TAG"# *"KEY_VALID_CHARS"+ *"CLOSE_TAG
     END_BLOCK=OPEN_TAG"\\\ *"KEY_VALID_CHARS"+ *"CLOSE_TAG
 
@@ -58,18 +57,18 @@ function escapeRegex(regex) {
     return result
 }
 
-function compile(type, subtype, text) {
+function compile(type, subtype, opt, text) {
     sec=sectionKey()
-    print type SEP subtype SEP sec SEP text
+    print type SEP subtype SEP opt SEP sec SEP text
 }
 
 function compiletext(text) {
-    compile(C_TEXT, C_TXT_NWLN, text)
+    compile(C_TEXT, C_TXT_NWLN, C_OPT_EMPTY, text)
 }
 
 function checkLine() {
-    if ($0 !~ ANY_TAG) { return 1 }
-    return 0
+    if ($0 !~ ANY_TAG) { return true }
+    return false
 }
 
 $0 !~ ANY_TAG && $0 !~ COMMENT_START && !insideComment { compiletext($0); next } 
@@ -77,6 +76,8 @@ $0 !~ ANY_TAG && $0 !~ COMMENT_START && !insideComment { compiletext($0); next }
 match($0, COMMENT) && !insideComment {
     do {
         removeTag("")
+        if (isEmpty($0)) { next }
+        debug("moawkc", "Full commnet " $0)
         if (checkLine()) { compiletext($0); next }
     } while(match($0, COMMENT))
 }
@@ -84,12 +85,14 @@ match($0, COMMENT) && !insideComment {
 match($0, COMMENT_START) && !insideComment {
     insideComment=1
     $0=substr($0, 0, RSTART-1) 
-    compile("text", "simple", $0)
+    if (isEmpty($0)) { next }
+    compile("text", "simple", C_OPT_EMPTY, $0)
 }
 
 insideComment && match($0, COMMENT_END) {
     $0=substr($0, RSTART+CLOSE_TAG_LEN, length($0))
     insideComment=0
+    if (isEmpty($0)) { next }
 }
 
 $0 !~ ANY_TAG && !insideComment {
@@ -124,30 +127,34 @@ function delimiter() {
         delimiter()
     }
     if ($0 == "") return
-    parseTags(C_TXT_NWLN)
+    parseTags(C_TXT_SIMPLE)
 }
 
 function parseTags(textType) {
     while(match($0, ANY_NORMAL)) {
+        options=C_OPT_EMPTY
+
         if (RSTART != 0) {
             text = substr($0, 0, RSTART - 1)
-            compile(C_TEXT, C_TXT_SIMPLE, text)
+            compile(C_TEXT, C_TXT_SIMPLE, C_OPT_EMPTY, text)
         }
 
         tag=getTag()
+        escape=true
+        if (match(tag, ESCAPE_NORMAL)) { escape=false }
         key=substr(tag, OPEN_TAG_LEN+1, length(tag)-CLOSE_TAG_LEN-OPEN_TAG_LEN)
         key=removeSpaces(key)
 
         type=substr(key, 0, 1)
         
         start=2
-        if (type == "#") {
+        if (type == MO_SEC) {
             type=C_SECTION
             secVal=substr(key, start, length(key))
             SEC=secVal
             SECTION[SEC_I]=SEC
             SEC_I+=1
-        } else if (type == "\\") {
+        } else if (type == MO_END_SEC) {
             type=C_END_SECTION
             secVal=substr(key, start, length(key))
             SEC=secVal
@@ -158,20 +165,23 @@ function parseTags(textType) {
                 exit 1
             }
             SECTION[SEC_I]=""
-        } else if (type == ">") {
+        } else if (type == MO_TEMPLATE) {
 
         } else { 
             start=start - 1
             type = C_REPLACE
+            if ( ! escape) {
+                options = C_OPT_NO_ESCAPE
+            }
         }
 
         value=substr(key, start, length(key))
         value=removeSpaces(value)
 
-        compile(C_TAG, type, value)
+        compile(C_TAG, type, options, value)
         $0=substr($0, RSTART + RLENGTH, length($0))
     }
-    compile(C_TEXT, textType, $0)
+    compile(C_TEXT, C_TXT_NWLN, C_OPT_EMPTY, $0)
 }
 
 function sectionKey() {
@@ -188,8 +198,4 @@ function removeTag(value) {
 
 function getTag() { return substr($0, RSTART, RLENGTH) }
 
-function removeSpaces(key) {
-    gsub(/^[ \t]+|[ \t]+$/, "", key)
-    return key
-}
 
